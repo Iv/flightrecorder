@@ -7,6 +7,7 @@
 *.moc
 *.wpt
 *.zip
+*.pyc
 /build
 /debian/files
 /debian/flightrecorder.debhelper.log
@@ -17,3 +18,4 @@
 /debian/python-module-stampdir/
 /dist
 /flightrecorder.egg-info
+/.idea/*

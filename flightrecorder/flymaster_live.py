@@ -221,7 +221,7 @@ class FlymasterLive(FlightRecorderBase):
                     abs(lat) / 60000, (abs(lat) % 60000) / 1000, abs(lat) % 1000, 'S' if lat < 0 else 'N',
                     abs(lon) / 60000, (abs(lon) % 60000) / 1000, abs(lon) % 1000, 'E' if lon < 0 else 'W',
                     'A' if packet.fix_flag & 0x80 else 'V',
-                    Flymaster.pressure_altitude(pressure),
+                    FlymasterLive.pressure_altitude(pressure),
                     alt)
             elif isinstance(packet, TrackPositionRecordDeltas):
                 if lat is None:
@@ -241,7 +241,7 @@ class FlymasterLive(FlightRecorderBase):
                         abs(lat) / 60000, (abs(lat) % 60000) / 1000, abs(lat) % 1000, 'S' if lat < 0 else 'N',
                         abs(lon) / 60000, (abs(lon) % 60000) / 1000, abs(lon) % 1000, 'E' if lon < 0 else 'W',
                         'A' if tprd.fix_flag & 0x80 else 'V',
-                        Flymaster.pressure_altitude(pressure),
+                        FlymasterLive.pressure_altitude(pressure),
                         alt)
 
     def pfmdnl_lst(self):
@@ -263,7 +263,7 @@ class FlymasterLive(FlightRecorderBase):
         return add_igc_filenames(tracks, 'XFR', self.serial_number)
 
     def ipfmdnl(self, dt, timeout=1):
-        self.write(('PFMDNL,%s,' % dt.strftime('%y%m%d%H%M%S')).encode('nmea_sentence'))
+        self.write(('PFMDNL,%s,2' % dt.strftime('%y%m%d%H%M%S')).encode('nmea_sentence'))
         while True:
             packet = self.readpacket(timeout)
             if packet.id == 0xa0a0:

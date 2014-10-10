@@ -249,7 +249,7 @@ class FlymasterLive(FlightRecorderBase):
 
         def igc_lambda(self, dt):
             return lambda: self.igc_helper(self.ipfmdnl(dt))
-        for m in self.ieach('PFMDNL,LST,', PFMDNL_LST_RE):
+        for m in self.ieach('PFMDNL,LST,', PFMDNL_LST_RE, timeout=2):
             count, index, day, month, year, hour, minute, second = map(int, m.groups()[:8])
             hours, minutes, seconds = map(int, m.groups()[8:11])
             dt = datetime.datetime(year + 2000, month, day, hour, minute, second, tzinfo=UTC())
@@ -258,7 +258,7 @@ class FlymasterLive(FlightRecorderBase):
                 datetime=dt,
                 duration=datetime.timedelta(hours=hours, minutes=minutes, seconds=seconds),
                 _igc_lambda=igc_lambda(self, dt)))
-            if index  == count:
+            if index == count:
                 break
 
         return add_igc_filenames(tracks, 'XFR', self.serial_number)

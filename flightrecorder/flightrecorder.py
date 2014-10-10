@@ -23,6 +23,7 @@ import os
 from errors import TimeoutError
 from fifty20 import Fifty20
 from flymaster import Flymaster
+from flymaster_live import FlymasterLive
 from serialio import SerialIO
 from sixty15 import Sixty15
 
@@ -42,7 +43,8 @@ DEVICE_GLOBS = {
 
 class FlightRecorder(object):
 
-    SUPPORTED_MODELS = Fifty20.SUPPORTED_MODELS + Flymaster.SUPPORTED_MODELS + Sixty15.SUPPORTED_MODELS
+    SUPPORTED_MODELS = Fifty20.SUPPORTED_MODELS + Flymaster.SUPPORTED_MODELS + \
+                       Sixty15.SUPPORTED_MODELS + FlymasterLive.SUPPORTED_MODELS
 
     def __new__(self, device=None, model=None):
         if device:
@@ -61,6 +63,8 @@ class FlightRecorder(object):
                 return Fifty20(io)
             elif model in Flymaster.SUPPORTED_MODELS:
                 return Flymaster(io)
+            elif model in FlymasterLive.SUPPORTED_MODELS:
+                return FlymasterLive(io)
             elif model in Sixty15.SUPPORTED_MODELS:
                 return Sixty15(io)
             elif model is None:
@@ -75,6 +79,8 @@ class FlightRecorder(object):
                         logger.info('readline %r' % line)
                         if re.match('\x13\$PBRSNP,[^,]*,[^,]*,[^,]*,[^,]*\*[0-9A-F]{2}\r\n\x11\Z', line):
                             return Fifty20(io, line)
+                        if re.match('\$PBRSNP,(Live|NAV),[^,]*,[^,]*,[^,]*,[^,]*,[^,]*\*[0-9A-F]{2}\r\n\Z', line):
+                            return FlymasterLive(io, line)
                         if re.match('\$PBRSNP,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*\*[0-9A-F]{2}\r\n\Z', line):
                             return Flymaster(io, line)
                     except TimeoutError:

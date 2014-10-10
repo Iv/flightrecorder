@@ -258,8 +258,9 @@ class FlymasterLive(FlightRecorderBase):
                 datetime=dt,
                 duration=datetime.timedelta(hours=hours, minutes=minutes, seconds=seconds),
                 _igc_lambda=igc_lambda(self, dt)))
-            if index + 1 == count:
+            if index  == count:
                 break
+
         return add_igc_filenames(tracks, 'XFR', self.serial_number)
 
     def ipfmdnl(self, dt, timeout=1):

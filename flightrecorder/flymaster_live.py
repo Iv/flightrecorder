@@ -79,26 +79,45 @@ class FlightInformationRecord(_Struct):
 class KeyTrackPositionRecord(_Struct):
 
     def __init__(self, data):
-        fields = struct.unpack('<BiihhI', data)
+        fields = struct.unpack('<BbiihhIb', data)
         self.fix_flag = fields[0]
-        self.lat = fields[1]
-        self.lon = fields[2]
-        self.alt = fields[3]
-        self.pressure = fields[4]
-        self.dt = EPOCH + datetime.timedelta(seconds=fields[5])
+        self.speed = fields[1]
+        self.lat = fields[2]
+        self.lon = fields[3]
+        self.alt = fields[4]
+        self.pressure = fields[5]
+        self.dt = EPOCH + datetime.timedelta(seconds=fields[6])
+        self.heading = fields[7]
 
 
 class TrackPositionRecordDelta(_Struct):
 
     def __init__(self, data):
-        fields = struct.unpack('<Bbbbbb', data)
+        fields = struct.unpack('<Bbbbbbbb', data)
         self.fix_flag = fields[0]
         self.lat_offset = fields[1]
         self.lon_offset = fields[2]
         self.alt_offset = fields[3]
         self.pressure_offset = fields[4]
         self.dt_offset = datetime.timedelta(seconds=fields[5])
+        self.speed = fields[6]
+        self.heading = fields[7]
 
+
+class TasDataRecord(_Struct):
+    def __init__(self, data):
+        fields = struct.unpack('<Bb', data)
+        self.fix_flag = fields[0]
+        self.u_tas = fields[1]
+
+
+class HeartDataRecord(_Struct):
+    def __init__(self, data):
+        fields = struct.unpack('<Bbbb')
+        self.fix_flag = fields[0]
+        self.heart_beat = fields[1]
+        self.g_force = fields[2]
+        self.steps_per_minute = fields[3]
 
 class TrackPositionRecordDeltas(list):
 
@@ -265,18 +284,33 @@ class FlymasterLive(FlightRecorderBase):
 
     def ipfmdnl(self, dt, timeout=1):
         self.write(('PFMDNL,%s,2' % dt.strftime('%y%m%d%H%M%S')).encode('nmea_sentence'))
+        track = ''
+        from time import sleep
+        sleep(0.5)
         while True:
-            packet = self.readpacket(timeout)
-            if packet.id == 0xa0a0:
-                yield FlightInformationRecord(packet.data)
-            elif packet.id == 0xa1a1:
-                yield KeyTrackPositionRecord(packet.data)
-            elif packet.id == 0xa2a2:
-                yield TrackPositionRecordDeltas(packet.data)
-            elif packet.id == 0xa3a3:
+            data = self.io.read(3, 128)
+            track += data
+            if len(data) < 128:
                 break
-            else:
-                logger.info('unknown packet type %04X' % packet.id)
+
+        logger.info('readpacket %r, %d' % (track[:10], len(track)) )
+
+            # while True:
+            #     packet = self.readpacket(timeout)
+            #     if packet.id == 0xa0a0:
+            #         got_data = True
+            #         yield FlightInformationRecord(packet.data)
+            #     elif packet.id == 0xa1a1:
+            #         yield KeyTrackPositionRecord(packet.data)
+            #     elif packet.id == 0xa2a2:
+            #         yield TrackPositionRecordDeltas(packet.data)
+            #     elif packet.id == 0xa3a3:
+            #         if not got_data:
+            #             retrys += 1
+            #             logger.info('download failed, retrying')
+            #         break
+            #     else:
+            #         logger.info('unknown packet type %04X' % packet.id)
 
     def ipfmwpl(self):
         try:

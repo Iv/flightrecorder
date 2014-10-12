@@ -19,6 +19,7 @@ import datetime
 import logging
 import re
 import struct
+from time import sleep
 
 from base import FlightRecorderBase
 from common import Track, add_igc_filenames
@@ -64,7 +65,6 @@ class SNP(_Struct):
 
 
 class FlightInformationRecord(_Struct):
-
     def __init__(self, data):
         fields = struct.unpack('<BBBBI8s15s15s15s', data[:61])
         self.software_version = '%d.%02d' % (fields[0], fields[1])
@@ -77,6 +77,7 @@ class FlightInformationRecord(_Struct):
 
 
 class KeyTrackPositionRecord(_Struct):
+    size = 19
 
     def __init__(self, data):
         fields = struct.unpack('<BbiihhIb', data)
@@ -91,6 +92,7 @@ class KeyTrackPositionRecord(_Struct):
 
 
 class TrackPositionRecordDelta(_Struct):
+    size = 8
 
     def __init__(self, data):
         fields = struct.unpack('<Bbbbbbbb', data)
@@ -105,6 +107,7 @@ class TrackPositionRecordDelta(_Struct):
 
 
 class TasDataRecord(_Struct):
+    size = 2
     def __init__(self, data):
         fields = struct.unpack('<Bb', data)
         self.fix_flag = fields[0]
@@ -112,12 +115,14 @@ class TasDataRecord(_Struct):
 
 
 class HeartDataRecord(_Struct):
+    size = 4
     def __init__(self, data):
-        fields = struct.unpack('<Bbbb')
+        fields = struct.unpack('<Bbbb', data)
         self.fix_flag = fields[0]
         self.heart_beat = fields[1]
         self.g_force = fields[2]
         self.steps_per_minute = fields[3]
+
 
 class TrackPositionRecordDeltas(list):
 
@@ -127,10 +132,11 @@ class TrackPositionRecordDeltas(list):
             self.append(TrackPositionRecordDelta(data[i:i + 6]))
             i += 6
 
+packets = [KeyTrackPositionRecord, TrackPositionRecordDelta, TasDataRecord, HeartDataRecord]
 
 class FlymasterLive(FlightRecorderBase):
 
-    SUPPORTED_MODELS = 'NAV Live'.split()
+    SUPPORTED_MODELS = 'Nav Live Gps'.split()
 
     def __init__(self, io, line=None):
         self.io = io
@@ -152,33 +158,33 @@ class FlymasterLive(FlightRecorderBase):
                 logger.info('readline %r' % result)
                 return result
 
-    def readpacket(self, timeout):
-        while True:
-            s = None
-            while True:
-                if len(self.buffer) >= 2:
-                    id = struct.unpack('<H', self.buffer[:2])[0]
-                    if id == 0xa3a3:
-                        logger.info('readpacket %r' % self.buffer[:2])
-                        self.buffer = self.buffer[2:]
-                        return Packet(id, None)
-                    if len(self.buffer) >= 4:
-                        length = ord(self.buffer[2])
-                        if len(self.buffer) >= 4 + length:
-                            s = self.buffer[:4 + length]
-                            self.buffer = self.buffer[4 + length:]
-                            break
-                self.buffer += self.io.read(timeout)
-            logger.info('readpacket %r' % s[:length + 4])
-            data = s[3:length + 3]
-            checksum = length
-            for c in data:
-                checksum ^= ord(c)
-            if checksum != ord(s[length + 3]):
-                self.write('\xb2')
-                continue
-            self.write('\xb1')
-            return Packet(id, data)
+    # def readpacket(self, timeout):
+    #     while True:
+    #         s = None
+    #         while True:
+    #             if len(self.buffer) >= 2:
+    #                 id = struct.unpack('<H', self.buffer[:2])[0]
+    #                 if id == 0xa3a3:
+    #                     logger.info('readpacket %r' % self.buffer[:2])
+    #                     self.buffer = self.buffer[2:]
+    #                     return Packet(id, None)
+    #                 if len(self.buffer) >= 4:
+    #                     length = ord(self.buffer[2])
+    #                     if len(self.buffer) >= 4 + length:
+    #                         s = self.buffer[:4 + length]
+    #                         self.buffer = self.buffer[4 + length:]
+    #                         break
+    #             self.buffer += self.io.read(timeout)
+    #         logger.info('readpacket %r' % s[:length + 4])
+    #         data = s[3:length + 3]
+    #         checksum = length
+    #         for c in data:
+    #             checksum ^= ord(c)
+    #         if checksum != ord(s[length + 3]):
+    #             self.write('\xb2')
+    #             continue
+    #         self.write('\xb1')
+    #         return Packet(id, data)
 
     def write(self, line):
         logger.info('write %r' % line)
@@ -285,7 +291,6 @@ class FlymasterLive(FlightRecorderBase):
     def ipfmdnl(self, dt, timeout=1):
         self.write(('PFMDNL,%s,2' % dt.strftime('%y%m%d%H%M%S')).encode('nmea_sentence'))
         track = ''
-        from time import sleep
         sleep(0.5)
         while True:
             data = self.io.read(3, 128)
@@ -293,24 +298,30 @@ class FlymasterLive(FlightRecorderBase):
             if len(data) < 128:
                 break
 
-        logger.info('readpacket %r, %d' % (track[:10], len(track)) )
+        logger.info('track %r, %d' % (track[:20], len(track)))
 
-            # while True:
-            #     packet = self.readpacket(timeout)
-            #     if packet.id == 0xa0a0:
-            #         got_data = True
-            #         yield FlightInformationRecord(packet.data)
-            #     elif packet.id == 0xa1a1:
-            #         yield KeyTrackPositionRecord(packet.data)
-            #     elif packet.id == 0xa2a2:
-            #         yield TrackPositionRecordDeltas(packet.data)
-            #     elif packet.id == 0xa3a3:
-            #         if not got_data:
-            #             retrys += 1
-            #             logger.info('download failed, retrying')
-            #         break
-            #     else:
-            #         logger.info('unknown packet type %04X' % packet.id)
+        newfile=open('/home/iv/track','wb')
+        newfile.write(track)
+        newfile.close()
+
+        i = 12
+        while i < len(track):
+            id = struct.unpack_from('<B', track, i)[0]
+            logger.info("id %r", id & 0x7f)
+
+            for packet in packets:
+                packet_found = False
+                if id & 0x7f == packet.size or id & 0x7f == packet.size | 0x20:
+                    packet_found = True
+                    data = track[i:i+packet.size]
+                    i += packet.size
+                    yield packet(data)
+                if not packet_found:
+                    if id & 0x7f > 0:
+                        i += id & 0x7f
+                    else:
+                        raise ProtocolError('Unknown packet size')
+
 
     def ipfmwpl(self):
         try:
